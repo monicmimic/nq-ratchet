@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>NQ Ratchet</title>
+<style>
+  :root { --bg:#0c0e14;--card:#111520;--border:#1a2030;--text:#d4d7dd;--dim:#606880;--faint:#404860;--cyan:#4fc3f7;--green:#5ab87a;--red:#e85d4a; }
+  * { box-sizing:border-box;margin:0;padding:0; }
+  body { font-family:'SF Mono','Menlo','Courier New',monospace;background:var(--bg);color:var(--text);min-height:100vh;padding:16px 12px;max-width:480px;margin:0 auto;-webkit-text-size-adjust:100%; }
+  .hdr { border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:14px; }
+  .hdr h1 { font-size:11px;color:var(--dim);letter-spacing:2px;font-weight:400; }
+  .hdr p { font-size:10px;color:var(--faint);margin-top:2px; }
+  .sec { background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px; }
+  .lbl { font-size:11px;color:var(--dim);letter-spacing:1px;margin-bottom:8px; }
+  .row { display:flex;gap:8px;margin-bottom:8px; }
+  .wrap { position:relative;flex:1; }
+  .wrap .pfx { position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#506070;font-size:16px; }
+  .inp { width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px 12px 12px 28px;color:#e8eaf0;font-size:18px;font-family:inherit;outline:none; }
+  .inp:focus { border-color:#2a4060; }
+  .inp.sm { padding-left:12px;font-size:16px;text-align:center; }
+  .btn { background:#151a25;border:1px solid #2a4060;border-radius:6px;padding:12px 20px;color:var(--faint);font-size:15px;font-weight:700;font-family:inherit;cursor:default;white-space:nowrap; }
+  .btn.act { background:#1a3a5f;color:var(--cyan);cursor:pointer; }
+  .pbox { background:#0a1628;border:2px solid #1e3a5f;border-radius:10px;padding:20px 16px;text-align:center;margin-bottom:14px; }
+  .pbox .lb { font-size:11px;color:var(--dim);letter-spacing:1px; }
+  .pbox .sz { font-size:44px;font-weight:800;color:var(--cyan);margin-top:4px;line-height:1.1; }
+  .pbox .mt { font-size:12px;color:#506070;margin-top:6px; }
+  .ths { display:flex;justify-content:center;gap:20px;margin-top:12px;font-size:11px;flex-wrap:wrap; }
+  .ths span { color:#506070; }
+  .note { font-size:10px;color:var(--faint);margin-top:6px; }
+  .hb { background:transparent;border:none;color:#506070;font-size:11px;cursor:pointer;font-family:inherit;padding:4px 0; }
+  .hr { display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--card);font-size:11px; }
+  .ra { text-align:center;margin-top:20px;padding-bottom:24px; }
+  .rb { background:transparent;border:1px solid var(--border);border-radius:6px;padding:8px 24px;color:var(--faint);font-size:11px;font-family:inherit;cursor:pointer; }
+  .rb.cf { background:#3a1515;border-color:#5a2020;color:var(--red); }
+  .cb { background:transparent;border:1px solid var(--border);border-radius:6px;padding:8px 16px;color:#506070;font-size:11px;font-family:inherit;cursor:pointer;margin-left:8px; }
+</style>
+</head>
+<body>
+<div class="hdr"><h1>NQ RATCHET</h1><p>1000/1500/1700/2200 &mdash; 50m cap &mdash; deterministic</p></div>
+
+<div class="sec">
+  <div class="lbl">BROKER BALANCE</div>
+  <div class="row">
+    <div class="wrap"><span class="pfx">$</span><input type="text" inputmode="decimal" id="bi" class="inp" placeholder=""></div>
+  </div>
+  <div class="lbl">POSITION TRADED (micros)</div>
+  <div class="row">
+    <div class="wrap"><input type="text" inputmode="numeric" id="pi" class="inp sm" placeholder="—"></div>
+    <button id="ub" class="btn" onclick="doUp()">Update</button>
+  </div>
+  <div id="dp" class="note"></div>
+</div>
+
+<div id="pb" class="pbox">
+  <div class="lb">NEXT TRADE</div>
+  <div class="sz" id="ts">&mdash;</div>
+  <div class="mt" id="tm"></div>
+  <div class="ths" id="th"></div>
+</div>
+
+<div><button class="hb" id="hb" onclick="tH()">&#9654; History (0)</button>
+<div id="hl" style="max-height:220px;overflow-y:auto;margin-top:6px;display:none"></div></div>
+
+<div class="ra">
+  <button id="xrb" class="rb" onclick="doR()">Reset</button>
+  <button id="xcb" class="cb" onclick="cR()" style="display:none">Cancel</button>
+</div>
+
+<script>
+// ─── PRE-COMPUTED COMBINED RATCHET TABLE ───
+// [balance_threshold, micros] — from verified $1-step simulation
+// Deterministic: balance → position, no path dependency
+var STEPS = [
+  [20000, 4], [28576, 5], [33576, 6], [35975, 7], [36578, 8],
+  [43889, 9], [44580, 10], [70672, 20], [109165, 30], [178143, 40],
+  [197522, 50], [261900, 60], [280700, 70], [318800, 80], [370300, 90],
+  [401300, 100], [418300, 110], [427600, 120], [468900, 130], [516700, 140],
+  [561800, 150], [585400, 160], [605900, 170], [649700, 180], [677600, 190],
+  [692600, 200], [735500, 210], [747900, 220], [778400, 230], [799300, 240],
+  [821600, 250], [864500, 260], [906300, 270], [922400, 280], [948100, 290],
+  [989600, 300], [996300, 310], [1031400, 320], [1103400, 330], [1103500, 340],
+  [1176200, 350], [1247900, 360], [1280900, 370], [1319300, 380], [1334800, 390],
+  [1392100, 400], [1454200, 410], [1464300, 420], [1537000, 430], [1608700, 440],
+  [1623000, 450], [1646400, 460], [1666400, 470], [1681800, 480], [1756300, 490],
+  [1792500, 500]
+];
+var CAP = 500;
+var CNQ = 2.88, CMQ = 0.95;
+var SK = "nq-ratchet-v7";
+
+function cR2(m) { return Math.floor(m/10)*CNQ*2 + (m%10)*CMQ*2; }
+
+function lookup(bal) {
+  var pos = 0;
+  for (var i = 0; i < STEPS.length; i++) {
+    if (bal >= STEPS[i][0]) pos = STEPS[i][1];
+    else break;
+  }
+  return Math.min(pos, CAP);
+}
+
+function fm(m) {
+  var mi = Math.floor(m/10), r = m%10;
+  if (mi === 0) return r + "\u03BC";
+  if (r === 0) return mi + "m";
+  return mi + "m+" + r + "\u03BC";
+}
+
+function fo(t) {
+  if (!t) return "\u2014";
+  var mi = Math.floor(t/10), r = t%10;
+  if (r === 0 && mi > 0) return mi + " NQ";
+  if (mi === 0) return r + " MNQ";
+  return mi + " NQ + " + r + " MNQ";
+}
+
+function fu(v) { return "$" + Math.round(v).toLocaleString(); }
+
+function lS() {
+  try { var s = localStorage.getItem(SK); if (s) return JSON.parse(s); } catch(e) {}
+  return { bal: 20000, peak: 20000, pos: 4, h: [] };
+}
+function sS() { try { localStorage.setItem(SK, JSON.stringify(st)); } catch(e) {} }
+
+var st = null;
+var cr = false, hv = false;
+
+function rn() {
+  var bal = st.bal;
+  var peak = st.peak;
+  var pos = lookup(peak);
+  st.pos = pos;
+
+  document.getElementById("bi").placeholder = Math.round(bal).toLocaleString();
+  document.getElementById("pi").placeholder = pos;
+
+  var ts = document.getElementById("ts");
+  var tm = document.getElementById("tm");
+  ts.textContent = pos > 0 ? fo(pos) : "\u2014";
+  var comm = cR2(pos);
+  tm.textContent = pos > 0 ? fm(pos) + " \u2014 $" + comm.toFixed(2) + " RT" : "";
+
+  // Step thresholds
+  var th = document.getElementById("th");
+  th.innerHTML = "";
+  var nextUp = null, nextDown = null;
+  for (var i = 0; i < STEPS.length; i++) {
+    if (STEPS[i][1] > pos) { nextUp = STEPS[i][0]; break; }
+  }
+  // Step down: find lowest balance where position would be less (only matters if bal < peak)
+  for (var i = STEPS.length - 1; i >= 0; i--) {
+    if (STEPS[i][1] < pos) { nextDown = STEPS[i+1] ? STEPS[i+1][0] - 1 : null; break; }
+  }
+  var html = "";
+  if (bal < peak) {
+    html += '<span style="color:var(--red)">Peak: ' + fu(peak) + ' (ratchet locked)</span>';
+  }
+  if (nextUp && pos < CAP) {
+    html += '<span><span style="color:var(--green)">\u2191</span> ' + fo(lookup(nextUp)) + ' at ' + fu(nextUp) + '</span>';
+  }
+  if (pos >= CAP) {
+    html += '<span style="color:var(--cyan)">CAP REACHED</span>';
+  }
+  th.innerHTML = html;
+
+  // History
+  document.getElementById("hb").textContent = (hv ? "\u25BC" : "\u25B6") + " History (" + st.h.length + ")";
+  var hl = document.getElementById("hl");
+  if (hv && st.h.length > 0) {
+    hl.style.display = "block";
+    hl.innerHTML = "";
+    var sh = st.h.slice().reverse().slice(0, 40);
+    for (var j = 0; j < sh.length; j++) {
+      var e = sh[j];
+      hl.innerHTML += '<div class="hr">' +
+        '<span style="color:var(--faint)">' + new Date(e.t).toLocaleDateString("en-GB",{day:"2-digit",month:"2-digit"}) + '</span>' +
+        '<span style="color:#707880">' + fm(e.p) + ' traded</span>' +
+        '<span style="color:' + (e.d >= 0 ? "var(--green)" : "var(--red)") + '">' + (e.d >= 0 ? "+" : "") + "$" + Math.round(e.d).toLocaleString() + '</span>' +
+        '<span style="color:#707880">' + fu(e.b) + '</span>' +
+        '</div>';
+    }
+  } else {
+    hl.style.display = "none";
+  }
+}
+
+function doUp() {
+  var rawBal = document.getElementById("bi").value.replace(/[,$\s]/g, "");
+  var nb = parseFloat(rawBal);
+  if (isNaN(nb) || nb < 0) return;
+
+  var rawPos = document.getElementById("pi").value.replace(/[,$\s]/g, "");
+  var tradedPos = rawPos ? parseInt(rawPos) : st.pos;
+  if (isNaN(tradedPos) || tradedPos < 0) tradedPos = st.pos;
+
+  var delta = nb - st.bal;
+
+  st.h.push({ t: Date.now(), b: nb, d: delta, p: tradedPos });
+  st.bal = nb;
+  if (nb > st.peak) st.peak = nb;
+  sS();
+
+  document.getElementById("bi").value = "";
+  document.getElementById("pi").value = "";
+  document.getElementById("dp").innerHTML = "";
+  rn();
+}
+
+function doR() {
+  if (!cr) {
+    cr = true;
+    document.getElementById("xrb").className = "rb cf";
+    document.getElementById("xrb").textContent = "Confirm reset";
+    document.getElementById("xcb").style.display = "inline-block";
+    return;
+  }
+  st = { bal: 20000, peak: 20000, pos: 4, h: [] };
+  sS(); cr = false;
+  document.getElementById("xrb").className = "rb";
+  document.getElementById("xrb").textContent = "Reset";
+  document.getElementById("xcb").style.display = "none";
+  rn();
+}
+
+function cR() {
+  cr = false;
+  document.getElementById("xrb").className = "rb";
+  document.getElementById("xrb").textContent = "Reset";
+  document.getElementById("xcb").style.display = "none";
+}
+
+function tH() { hv = !hv; rn(); }
+
+// Live preview
+document.getElementById("bi").addEventListener("input", function() {
+  var raw = this.value.replace(/[,$\s]/g, "");
+  var nb = parseFloat(raw);
+  var btn = document.getElementById("ub");
+  var pv = document.getElementById("dp");
+  if (!this.value || isNaN(nb) || nb < 0) { btn.className = "btn"; pv.innerHTML = ""; return; }
+  btn.className = "btn act";
+  var d = nb - st.bal;
+  var newPeak = Math.max(nb, st.peak);
+  var newPos = lookup(newPeak);
+  pv.style.color = d >= 0 ? "var(--green)" : "var(--red)";
+  pv.innerHTML = (d >= 0 ? "+" : "") + "$" + Math.round(d).toLocaleString() +
+    (newPos !== st.pos ? " \u2014 <span style='color:var(--cyan)'>" + fo(newPos) + " next</span>" : "");
+});
+
+document.getElementById("bi").addEventListener("keydown", function(e) { if (e.key === "Enter") doUp(); });
+document.getElementById("pi").addEventListener("keydown", function(e) { if (e.key === "Enter") doUp(); });
+
+st = lS();
+rn();
+</script>
+</body>
+</html>
