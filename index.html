@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>NQ Ratchet</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#070b14;color:#c8d6e5;font-family:'JetBrains Mono','SF Mono',monospace;font-size:13px;min-height:100vh}
+.wrap{max-width:480px;margin:0 auto;padding:16px 12px 80px}
+.hdr{margin-bottom:20px;border-bottom:1px solid #1a2035;padding-bottom:12px}
+.hdr h1{font-size:11px;letter-spacing:3px;color:#3d5a80;font-weight:600;margin:0}
+.hdr p{font-size:10px;color:#2a3a55;margin-top:2px}
+.card{background:#0d1321;border:1px solid #1a2035;border-radius:8px;padding:16px;margin-bottom:16px}
+.lbl{font-size:10px;letter-spacing:1.5px;color:#3d5a80;margin-bottom:8px;font-weight:500}
+.row{display:flex;gap:8px;align-items:stretch}
+.row input{flex:1;background:#111827;border:1px solid #1f2d44;border-radius:6px;padding:12px 12px 12px 28px;color:#e2e8f0;font-size:20px;font-family:inherit;font-weight:500;outline:none;width:100%}
+.row .small-input{font-size:16px;padding:12px;text-align:center;flex:0 0 80px}
+.dollar{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#3d5a80;font-size:18px;font-weight:300}
+.inp-wrap{flex:1;position:relative}
+.btn{background:#0ea5e9;color:#020617;border:none;border-radius:6px;padding:0 20px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.5px}
+.btn:active{background:#38bdf8}
+.hero{background:linear-gradient(135deg,#0d1a2e,#0d1321);border:1px solid #1a2035;border-radius:10px;padding:20px 16px;margin-bottom:16px;text-align:center;transition:all .3s}
+.hero.flash{background:linear-gradient(135deg,#0d2818,#0d1321);border-color:#166534}
+.hero .sub{font-size:10px;letter-spacing:2px;color:#4a6080;margin-bottom:4px}
+.hero .big{font-size:48px;font-weight:700;color:#e2e8f0;line-height:1;display:inline}
+.hero .inst{font-size:24px;font-weight:600;color:#0ea5e9;margin-left:10px}
+.hero .info{font-size:11px;color:#4a6080;margin-top:6px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.acct{background:#0d1321;border:1px solid #1a2035;border-radius:8px;padding:12px 10px}
+.acct.bust{background:#0d0d0d;border-color:#1a1111;opacity:.5}
+.acct .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.acct .letter{font-weight:700;font-size:14px}
+.acct .surv{font-size:10px;color:#3d5a80;margin-left:6px}
+.acct .pos{font-size:11px;color:#4a6080}
+.acct .bal{font-size:18px;font-weight:600;color:#e2e8f0;margin-bottom:2px}
+.acct .pct{font-size:10px;margin-bottom:6px}
+.green{color:#4ade80}.red{color:#f87171}
+.bar-bg{height:3px;background:#1a2035;border-radius:2px;overflow:hidden}
+.bar{height:100%;border-radius:2px;opacity:.6;transition:width .3s}
+.bar-lbl{font-size:9px;color:#2a3a55;margin-top:3px}
+.summary{background:#0d1321;border:1px solid #1a2035;border-radius:8px;padding:12px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:11px}
+.summary .k{color:#3d5a80}.summary .v{color:#e2e8f0;font-weight:500}
+.hist-btn{background:none;border:none;color:#3d5a80;cursor:pointer;font-family:inherit;font-size:11px;padding:4px 0}
+.hist{margin-top:8px;max-height:300px;overflow:auto}
+.hist-row{padding:6px 8px;border-bottom:1px solid #111827;font-size:10px;display:grid;grid-template-columns:auto 1fr auto auto;gap:8px;align-items:center}
+.reset-wrap{text-align:center;padding-top:8px;border-top:1px solid #111827;margin-top:16px}
+.reset{background:none;border:1px solid #1f2020;border-radius:6px;color:#3d3030;padding:8px 24px;font-family:inherit;font-size:11px;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <h1>NQ RATCHET</h1>
+    <p>1000/1500/1700/2200 &middot; D-up A-down &middot; 7+&mu; &middot; 50m cap</p>
+  </div>
+
+  <div class="card">
+    <div class="lbl">BROKER BALANCE</div>
+    <div class="row">
+      <div class="inp-wrap">
+        <span class="dollar">$</span>
+        <input id="balInput" type="text" inputmode="decimal" placeholder="20,000"/>
+      </div>
+      <input id="posInput" class="small-input" type="text" inputmode="numeric" placeholder="pos"/>
+      <button class="btn" onclick="doUpdate()">Update</button>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:6px">
+      <span style="font-size:9px;color:#2a3a55">Enter broker balance</span>
+      <span style="font-size:9px;color:#2a3a55">Last pos traded</span>
+    </div>
+  </div>
+
+  <div class="hero" id="hero">
+    <div class="sub">NEXT TRADE</div>
+    <div><span class="big" id="tradeMain">4</span><span class="inst" id="tradeInst">MNQ</span></div>
+    <div class="info" id="tradeInfo">4&mu; &middot; $7.60 RT</div>
+  </div>
+
+  <div class="grid" id="acctGrid"></div>
+
+  <div class="summary" id="summaryGrid"></div>
+
+  <div>
+    <button class="hist-btn" onclick="toggleHist()"><span id="histArrow">&#9654;</span> History (<span id="histCount">0</span>)</button>
+    <div class="hist" id="histList" style="display:none"></div>
+  </div>
+
+  <div class="reset-wrap">
+    <button class="reset" onclick="doReset()">Reset</button>
+  </div>
+</div>
+
+<script>
+// ─── ANALYTICAL TABLE (pre-computed, verified against monetary.py) ──────
+const T = [
+    {b:20000.00,t:4,r:[1,1,1,1],a:[3800.00,4800.00,5200.00,6200.00]},
+    {b:28575.20,t:5,r:[2,1,1,1],a:[5943.80,6943.80,7343.80,8343.80]},
+    {b:33575.20,t:6,r:[2,2,1,1],a:[7943.80,7943.80,8343.80,9343.80]},
+    {b:35975.20,t:7,r:[2,2,2,1],a:[8743.80,8743.80,8743.80,9743.80]},
+    {b:36576.85,t:8,r:[3,2,2,1],a:[8915.70,8915.70,8915.70,9829.75]},
+    {b:43889.25,t:9,r:[3,2,2,2],a:[11657.85,10743.80,10743.80,10743.80]},
+    {b:44578.50,t:10,r:[4,2,2,2],a:[11887.60,10896.97,10896.97,10896.97]},
+    {b:70672.17,t:20,r:[6,4,4,6],a:[17906.33,18991.73,17658.40,16115.70]},
+    {b:109165.27,t:30,r:[10,7,6,7],a:[29204.56,29562.75,26231.40,24166.56]},
+    {b:178145.53,t:40,r:[10,10,10,10],a:[46623.28,50618.34,43300.61,37603.30]},
+    {b:197522.49,t:50,r:[20,10,10,10],a:[51467.52,55462.58,48144.85,42447.54]},
+    {b:261856.89,t:60,r:[30,10,10,10],a:[77201.28,68329.46,61011.73,55314.42]},
+    {b:280685.26,t:70,r:[30,20,10,10],a:[86615.46,71467.52,64149.79,58452.48]},
+    {b:318764.27,t:80,r:[40,20,10,10],a:[102935.04,82347.24,69589.65,63892.34]},
+    {b:370231.79,t:90,r:[50,20,10,10],a:[128668.80,95214.12,76023.09,70325.78]},
+    {b:401231.63,t:100,r:[50,20,20,10],a:[145890.93,102102.97,79467.52,73770.21]},
+    {b:418254.89,t:110,r:[60,20,20,10],a:[154402.56,105507.62,82872.17,75472.53]},
+    {b:427570.01,t:120,r:[60,30,20,10],a:[159483.53,107201.28,84565.83,76319.36]},
+    {b:468875.58,t:130,r:[70,30,20,10],a:[180136.32,117527.67,91450.09,79761.49]},
+    {b:516666.85,t:140,r:[80,30,20,10],a:[205870.08,128556.43,98802.59,83437.75]},
+    {b:561700.93,t:150,r:[90,30,20,10],a:[231603.84,138206.59,105236.03,86654.47]},
+    {b:585343.19,t:160,r:[90,40,20,10],a:[245789.20,142935.04,108388.34,88230.62]},
+    {b:605873.68,t:170,r:[100,40,20,10],a:[257337.60,148067.66,110954.65,89513.77]},
+    {b:649621.07,t:180,r:[110,40,20,10],a:[283071.36,158361.17,116101.40,92087.15]},
+    {b:677520.01,t:190,r:[110,40,30,10],a:[300120.71,164560.93,119201.28,93637.09]},
+    {b:692520.35,t:200,r:[120,40,30,10],a:[308805.12,167718.90,121569.76,94426.58]},
+    {b:735409.95,t:210,r:[130,40,30,10],a:[334538.88,176296.82,128003.20,96571.06]},
+    {b:747862.86,t:220,r:[130,50,30,10],a:[342247.82,178668.80,129782.18,97164.06]},
+    {b:778366.40,t:230,r:[140,50,30,10],a:[360272.64,185601.42,133941.76,98550.58]},
+    {b:799456.00,t:240,r:[140,50,30,20],a:[373109.79,190186.12,136692.57,99467.52]},
+    {b:821564.48,t:250,r:[150,50,30,20],a:[386006.40,194792.05,139456.13,101309.89]},
+    {b:864454.08,t:260,r:[160,50,30,20],a:[411740.16,203369.97,144602.89,104741.06]},
+    {b:906271.44,t:270,r:[170,50,30,20],a:[437473.92,211411.77,149427.97,107957.78]},
+    {b:922421.70,t:280,r:[170,60,30,20],a:[447642.60,214402.56,151222.44,109154.10]},
+    {b:948058.30,t:290,r:[180,60,30,20],a:[463207.68,219896.12,153969.22,110985.28]},
+    {b:989518.24,t:300,r:[190,60,30,20],a:[488941.44,228474.04,158258.18,113844.59]},
+    {b:996286.87,t:310,r:[190,60,40,20],a:[493228.24,229827.76,158935.04,114295.83]},
+    {b:1031279.28,t:320,r:[200,60,40,20],a:[514675.20,236600.49,163450.19,116553.41]},
+    {b:1103294.90,t:330,r:[210,60,40,20],a:[559684.96,250103.42,172452.14,121054.38]},
+    {b:1103475.88,t:340,r:[210,70,40,20],a:[559800.13,250136.32,172474.08,121065.35]},
+    {b:1176162.36,t:350,r:[220,70,40,20],a:[604694.72,265101.18,181025.43,125341.03]},
+    {b:1247768.80,t:360,r:[230,70,40,20],a:[649704.48,279422.47,189209.02,129432.82]},
+    {b:1280927.92,t:370,r:[230,80,40,20],a:[670889.48,285870.08,192893.37,131275.00]},
+    {b:1319254.71,t:380,r:[240,80,40,20],a:[694714.24,294156.95,197036.81,133346.71]},
+    {b:1334758.65,t:390,r:[240,80,50,20],a:[704506.20,297420.94,198668.80,134162.71]},
+    {b:1391987.58,t:400,r:[250,80,50,20],a:[739724.00,309160.21,206005.84,137097.53]},
+    {b:1454205.74,t:410,r:[250,90,50,20],a:[778610.35,321603.84,213783.11,140208.44]},
+    {b:1464248.13,t:420,r:[260,90,50,20],a:[784733.76,323808.27,215007.79,140698.31]},
+    {b:1536956.20,t:430,r:[270,90,50,20],a:[829743.52,339388.57,223663.52,144160.60]},
+    {b:1608638.41,t:440,r:[280,90,50,20],a:[874753.28,354391.82,231998.66,147494.65]},
+    {b:1623040.00,t:450,r:[280,100,50,20],a:[883917.93,357337.60,233635.20,148149.27]},
+    {b:1646710.19,t:460,r:[280,100,50,30],a:[898646.05,362597.64,236265.22,149201.28]},
+    {b:1666373.70,t:470,r:[280,100,60,30],a:[910615.14,366872.32,238402.56,150483.68]},
+    {b:1681729.11,t:480,r:[290,100,60,30],a:[919763.04,370139.43,240362.82,151463.82]},
+    {b:1756228.02,t:490,r:[300,100,60,30],a:[964772.80,385660.03,249675.19,156120.00]},
+    {b:1792543.52,t:500,r:[300,110,60,30],a:[987006.78,393071.36,254121.99,158343.40]}
+];
+
+const PROFILES = [
+  {label:'A',surv:1000,color:'#4ade80',dep:3800.00},
+  {label:'B',surv:1500,color:'#38bdf8',dep:4800.00},
+  {label:'C',surv:1700,color:'#c084fc',dep:5200.00},
+  {label:'D',surv:2200,color:'#fb923c',dep:6200.00}
+];
+const COMM_MNQ=0.95,COMM_NQ=2.88;
+
+function commRT(m){return Math.floor(m/10)*COMM_NQ*2+(m%10)*COMM_MNQ*2}
+
+// ─── TABLE LOOKUP ───────────────────────────────────────────────────────
+function lookup(broker){
+  // Find highest entry where broker >= threshold
+  let idx = -1;
+  for(let i=0;i<T.length;i++){
+    if(broker >= T[i].b - 0.50) idx = i;
+    else break;
+  }
+  if(idx < 0) return {total:0, rounded:[0,0,0,0], bals:[0,0,0,0]};
+  
+  const e = T[idx];
+  // Interpolate per-account balances within this segment
+  if(idx < T.length-1){
+    const next = T[idx+1];
+    const frac = Math.min(1, Math.max(0, (broker - e.b) / (next.b - e.b)));
+    const bals = e.a.map((b,i) => Math.round((b + frac*(next.a[i]-b))*100)/100);
+    return {total:e.t, rounded:e.r, bals:bals};
+  }
+  return {total:e.t, rounded:e.r, bals:e.a};
+}
+
+function fmtPos(m){
+  if(m===0) return '\u2014';
+  const mi=Math.floor(m/10),r=m%10;
+  if(mi===0) return r+'\u03BC';
+  if(r===0) return mi+'m';
+  return mi+'m+'+r+'\u03BC';
+}
+function fmtMoney(v){
+  if(Math.abs(v)>=1e6) return '$'+(v/1e6).toFixed(2)+'M';
+  return '$'+v.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
+}
+
+// ─── STATE ──────────────────────────────────────────────────────────────
+let state = null;
+const SK = 'nq-ratchet-v3';
+
+function loadState(){
+  try{const s=localStorage.getItem(SK);return s?JSON.parse(s):null}catch(e){return null}
+}
+function saveState(s){
+  try{localStorage.setItem(SK,JSON.stringify(s))}catch(e){}
+}
+
+function initState(){
+  return {broker:20000, peakPos:4, history:[]};
+}
+
+// ─── RENDER ─────────────────────────────────────────────────────────────
+function render(){
+  if(!state) return;
+  const {total, rounded, bals} = lookup(state.broker);
+  const pos = Math.max(total, state.peakPos);
+  
+  // If peakPos forces a higher position than the table gives,
+  // we need the rounded breakdown from the peak entry
+  let displayRounded = rounded;
+  let displayBals = bals;
+  if(pos > total){
+    // Find the entry matching peakPos
+    for(let i=T.length-1;i>=0;i--){
+      if(T[i].t === pos){displayRounded=T[i].r; break}
+      if(T[i].t < pos){displayRounded=T[i].r; break}
+    }
+  }
+  
+  // Trade display
+  const mi=Math.floor(pos/10), rem=pos%10;
+  let mainTxt, instTxt;
+  if(pos===0){mainTxt='0';instTxt='';}
+  else if(mi===0){mainTxt=String(rem);instTxt='MNQ';}
+  else if(rem===0){mainTxt=String(mi);instTxt='NQ';}
+  else{mainTxt=mi+'+'+rem;instTxt='NQ+MNQ';}
+  
+  document.getElementById('tradeMain').textContent=mainTxt;
+  document.getElementById('tradeInst').textContent=instTxt;
+  document.getElementById('tradeInfo').textContent=fmtPos(pos)+' \u00B7 $'+commRT(pos).toFixed(2)+' RT';
+  document.getElementById('balInput').value=Math.round(state.broker).toLocaleString('en-US');
+  document.getElementById('posInput').value=pos;
+  
+  // Account cards
+  const grid=document.getElementById('acctGrid');
+  grid.innerHTML='';
+  for(let i=0;i<4;i++){
+    const p=PROFILES[i], bal=displayBals[i], posI=displayRounded[i];
+    const pctChg=((bal/p.dep)-1)*100;
+    const dead=bal<=0;
+    
+    // Find step info from individual ratchet
+    const stepInfo = getStepInfo(i, bal);
+    
+    const card=document.createElement('div');
+    card.className='acct'+(dead?' bust':'');
+    
+    let barHtml='';
+    if(!dead && stepInfo.nextThresh){
+      const pct=Math.min(100,Math.max(0,(bal-stepInfo.currThresh)/(stepInfo.nextThresh-stepInfo.currThresh)*100));
+      barHtml='<div class="bar-bg"><div class="bar" style="width:'+pct+'%;background:'+p.color+'"></div></div>'+
+              '<div class="bar-lbl">'+fmtMoney(stepInfo.nextThresh-bal)+' to step '+(stepInfo.step+2)+' ('+fmtPos(stepInfo.nextMicros)+')</div>';
+    }
+    
+    card.innerHTML=
+      '<div class="top"><div><span class="letter" style="color:'+p.color+'">'+p.label+'</span><span class="surv">'+p.surv+'</span></div>'+
+      '<span class="pos">'+(dead?'BUST':fmtPos(posI))+'</span></div>'+
+      '<div class="bal">'+(dead?'\u2014':fmtMoney(bal))+'</div>'+
+      '<div class="pct '+(pctChg>=0?'green':'red')+'">'+(pctChg>=0?'+':'')+pctChg.toFixed(1)+'% \u00B7 step '+(stepInfo.step+1)+'</div>'+
+      barHtml;
+    grid.appendChild(card);
+  }
+  
+  // Summary
+  const totalBal=displayBals.reduce((a,b)=>a+b,0);
+  const totalDep=PROFILES.reduce((a,p)=>a+p.dep,0);
+  const pnlPct=((totalBal/totalDep)-1)*100;
+  const alive=displayBals.filter(b=>b>0).length;
+  document.getElementById('summaryGrid').innerHTML=
+    '<div><span class="k">Total: </span><span class="v">'+fmtMoney(totalBal)+'</span></div>'+
+    '<div><span class="k">P&L: </span><span class="v '+(pnlPct>=0?'green':'red')+'">'+(pnlPct>=0?'+':'')+pnlPct.toFixed(1)+'%</span></div>'+
+    '<div><span class="k">Alive: </span><span class="v">'+alive+'/4</span></div>'+
+    '<div><span class="k">Updates: </span><span class="v">'+state.history.length+'</span></div>';
+  
+  // History count
+  document.getElementById('histCount').textContent=state.history.length;
+  renderHist();
+}
+
+// Individual account ratchet tables for step info display
+const ACCT_TABLES = [];
+(function(){
+  const SL=150,USD=2,DD=301;
+  function crt(m){return Math.floor(m/10)*2.88*2+(m%10)*0.95*2}
+  function mg(m){const mi=Math.floor(m/10),r=m%10;if(mi<=20)return m*100;return 20*10*100+(mi-20)*20276+r*100}
+  for(let pi=0;pi<4;pi++){
+    const surv=Math.max((PROFILES[pi].surv+SL)*USD,SL*USD);
+    const steps=[];for(let m=1;m<=10;m++)steps.push(m);for(let m=20;m<=500;m+=10)steps.push(m);
+    const raw=steps.map(m=>({t:Math.round((m*surv+mg(m)+DD*crt(m))*100)/100,m}));
+    const tbl=[];
+    for(let i=0;i<raw.length;i++){
+      let skip=false;
+      for(let j=i+1;j<raw.length;j++){if(raw[j].t<=raw[i].t&&raw[j].m>raw[i].m){skip=true;break}}
+      if(!skip)tbl.push(raw[i]);
+    }
+    ACCT_TABLES.push(tbl);
+  }
+})();
+
+function getStepInfo(ai, bal){
+  const tbl=ACCT_TABLES[ai];
+  let step=-1;
+  for(let i=0;i<tbl.length;i++){if(bal>=tbl[i].t-0.50)step=i;else break}
+  const nextThresh=(step+1<tbl.length)?tbl[step+1].t:null;
+  const currThresh=step>=0?tbl[step].t:(tbl[0]?tbl[0].t:0);
+  const nextMicros=(step+1<tbl.length)?tbl[step+1].m:0;
+  return {step, currThresh, nextThresh, nextMicros};
+}
+
+function renderHist(){
+  const list=document.getElementById('histList');
+  if(list.style.display==='none')return;
+  list.innerHTML='';
+  (state.history||[]).slice(0,30).forEach(h=>{
+    const row=document.createElement('div');
+    row.className='hist-row';
+    const d=new Date(h.ts);
+    const dateStr=d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
+    row.innerHTML=
+      '<span style="color:#2a3a55">'+dateStr+'</span>'+
+      '<span style="color:#4a6080">'+fmtMoney(h.broker)+'</span>'+
+      '<span class="'+(h.delta>=0?'green':'red')+'">'+(h.delta>=0?'+':'')+fmtMoney(Math.abs(h.delta))+'</span>'+
+      '<span style="color:#4a6080">'+fmtPos(h.pos)+'</span>';
+    list.appendChild(row);
+  });
+}
+
+// ─── ACTIONS ────────────────────────────────────────────────────────────
+function doUpdate(){
+  const balStr=document.getElementById('balInput').value.replace(/[,$\s]/g,'');
+  const posStr=document.getElementById('posInput').value.replace(/[^0-9]/g,'');
+  const broker=parseFloat(balStr);
+  const posTrd=parseInt(posStr)||0;
+  if(isNaN(broker)||broker<0)return;
+  
+  const oldBroker=state.broker;
+  const {total}=lookup(broker);
+  const newPos=Math.max(total, posTrd);
+  
+  state.broker=broker;
+  state.peakPos=newPos;
+  state.history=[{ts:Date.now(),broker:Math.round(broker*100)/100,delta:Math.round((broker-oldBroker)*100)/100,pos:newPos},...(state.history||[])].slice(0,100);
+  saveState(state);
+  render();
+  
+  // Flash
+  const hero=document.getElementById('hero');
+  hero.classList.add('flash');
+  setTimeout(()=>hero.classList.remove('flash'),600);
+}
+
+function doReset(){
+  if(!confirm('Reset to initial state? This clears all history.'))return;
+  state=initState();
+  saveState(state);
+  render();
+}
+
+function toggleHist(){
+  const list=document.getElementById('histList');
+  const arrow=document.getElementById('histArrow');
+  if(list.style.display==='none'){list.style.display='block';arrow.innerHTML='&#9660;';renderHist();}
+  else{list.style.display='none';arrow.innerHTML='&#9654;';}
+}
+
+// ─── INIT ───────────────────────────────────────────────────────────────
+document.getElementById('balInput').addEventListener('keydown',e=>{if(e.key==='Enter')doUpdate()});
+document.getElementById('posInput').addEventListener('keydown',e=>{if(e.key==='Enter')doUpdate()});
+
+state=loadState()||initState();
+render();
+</script>
+</body>
+</html>
